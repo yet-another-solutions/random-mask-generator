@@ -7,12 +7,9 @@ import io.github.jdiemke.triangulation.Triangle2D;
 import io.github.jdiemke.triangulation.Vector2D;
 
 import java.awt.*;
-import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Queue;
 import java.util.Random;
 import java.util.Vector;
 
