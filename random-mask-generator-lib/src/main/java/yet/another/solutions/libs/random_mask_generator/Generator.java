@@ -25,11 +25,29 @@ public class Generator {
     protected final static double epsilon = 0.000000001d;
 
     public static enum SnapMode {
-        NONE,
-        TOP,
-        BOTTOM,
-        LEFT,
-        RIGHT
+        NONE(0),
+        TOP(1),
+        BOTTOM(2),
+        LEFT(3),
+        RIGHT(4),
+        ;
+        private int cardinal;
+
+        SnapMode(int cardinal) {
+            this.cardinal = cardinal;
+        }
+
+        public static final SnapMode randomMode() {
+            Random random = new Random();
+            int next = random.nextInt(0,5);
+            for (SnapMode mode : SnapMode.values()) {
+                if (mode.cardinal == next) {
+                    return mode;
+                }
+            }
+            throw new IllegalStateException("Should never be there");
+        }
+
     }
 
     public static BufferedImage createRandom(int height, int width, int minfree, int num, SnapMode snap) {
