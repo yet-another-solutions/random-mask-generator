@@ -61,20 +61,36 @@ public class Generator {
                     break;
                 }
                 case LEFT -> {
-                    points.add(0, new Vector2D(stepD, height));
-                    points.add(0, new Vector2D(0, height));
-                    points.add(new Vector2D(stepD, 0));
-                    points.add(new Vector2D(0, 0));
+                    points.add(0, new Vector2D(stepD, 0));
+                    points.add(0, new Vector2D(0, 0));
+                    points.add(new Vector2D(stepD, height));
+                    points.add(new Vector2D(0, height));
+                    specialPoints.add(0, new Vector2D(stepD, 0));
+                    specialPoints.add(0, new Vector2D(0, 0));
+                    specialPoints.add(new Vector2D(stepD, height));
+                    specialPoints.add(new Vector2D(0, height));
                     break;
                 }
                 case RIGHT -> {
-                    points.add(0, new Vector2D(width, height));
-                    points.add(new Vector2D(width, 0));
+                    points.add(0, new Vector2D(width-stepD, 0));
+                    points.add(0, new Vector2D(width, 0));
+                    points.add(new Vector2D(width-stepD, height));
+                    points.add(new Vector2D(width, height));
+                    specialPoints.add(0, new Vector2D(width-stepD, 0));
+                    specialPoints.add(0, new Vector2D(width, 0));
+                    specialPoints.add(new Vector2D(width-stepD, height));
+                    specialPoints.add(new Vector2D(width, height));
                     break;
                 }
                 case BOTTOM -> {
-                    points.add(0, new Vector2D(0, 0));
-                    points.add(new Vector2D(width, 0));
+                    points.add(0, new Vector2D(0, height-stepD));
+                    points.add(0, new Vector2D(0, height));
+                    points.add(new Vector2D(width, height-stepD));
+                    points.add(new Vector2D(width, height));
+                    specialPoints.add(0, new Vector2D(0, height-stepD));
+                    specialPoints.add(0, new Vector2D(0, height));
+                    specialPoints.add(new Vector2D(width, height-stepD));
+                    specialPoints.add(new Vector2D(width, height));
                     break;
                 }
                 default -> throw new IllegalStateException("Should never be here");
@@ -193,13 +209,25 @@ public class Generator {
             if (good && snap != SnapMode.NONE) {
                 switch (snap) {
                     case TOP -> {
-                        if (point.y < stepD *2 && point.x > stepD *2 && point.y < width - stepD *2) {
+                        if (!(point.y > stepD *2 && point.x > stepD *2 && point.x < width - stepD *2)) {
                             good = false;
                         }
                         break;
                     }
                     case LEFT -> {
-                        if (point.x < stepD) {
+                        if (!(point.x > stepD * 2 && point.y > stepD * 2 && point.y < height - stepD * 2)) {
+                            good = false;
+                        }
+                        break;
+                    }
+                    case RIGHT -> {
+                        if (!(point.x < width-stepD * 2 && point.y > stepD * 2 && point.y < height - stepD * 2)) {
+                            good = false;
+                        }
+                        break;
+                    }
+                    case BOTTOM -> {
+                        if (!(point.y < height - stepD *2 && point.x > stepD *2 && point.x < width - stepD *2)) {
                             good = false;
                         }
                         break;
@@ -297,14 +325,8 @@ public class Generator {
                         map.put(triangle, 1);
                     }
                     if (snap != SnapMode.NONE) {
-                        switch (snap) {
-                            case TOP -> {
-                                if (containsPoint(triangle, specialPoints)) {
-                                    map.put(triangle, 100);
-                                }
-                                break;
-                            }
-                            default -> throw new IllegalStateException("Should never be there");
+                        if (containsPoint(triangle, specialPoints)) {
+                            map.put(triangle, 100);
                         }
                     }
                 }

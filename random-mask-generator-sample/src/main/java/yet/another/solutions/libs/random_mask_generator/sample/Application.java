@@ -15,7 +15,7 @@ public class Application {
         int size = 1000;
         int space = Double.valueOf(random.nextDouble(0.05,0.2)*size).intValue();
         int edges = random.nextInt(5,11);
-        BufferedImage image = Generator.createRandom(size, size, space,edges);
+        BufferedImage image = Generator.createRandom(size, size, space,22, Generator.SnapMode.NONE);
         ImageIO.write(image, "png", new File("./image.png"));
     }
 
