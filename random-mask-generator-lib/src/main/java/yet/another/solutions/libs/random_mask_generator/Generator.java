@@ -6,8 +6,13 @@ import io.github.jdiemke.triangulation.NotEnoughPointsException;
 import io.github.jdiemke.triangulation.Triangle2D;
 import io.github.jdiemke.triangulation.Vector2D;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.geom.Path2D;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +21,8 @@ import java.util.Random;
 import java.util.Vector;
 
 public class Generator {
+
+    protected final static double epsilon = 0.000000001d;
 
     public static BufferedImage createRandom(int height, int width, int minfree, int num) {
         Random random = new Random();
@@ -58,38 +65,46 @@ public class Generator {
         triangleSoup = soupTuple.a;
         outerEdges = soupTuple.b;
         while (outerEdges.size() < num) {
-            triangleSoup.remove(getOuterTriangle(triangleSoup));
+            triangleSoup.remove(getOuterTriangle(triangleSoup, points));
             outerEdges = getOuterEdges(triangleSoup);
         }
 
-        Vector<Vector2D> outerPoints = new Vector<>();
-        Edge2D firstEdge = outerEdges.firstElement();
-        outerPoints.add(firstEdge.a);
-        outerPoints.add(firstEdge.b);
-        outerEdges.remove(firstEdge);
-        do {
-            boolean fine = false;
-            for (Edge2D edge : new Vector<>(outerEdges)) {
-                if (pointBlank(outerPoints.lastElement(), edge.a)) {
-                    outerPoints.add(edge.b);
-                    outerEdges.remove(edge);
-                    fine = true;
-                    break;
-                } else if (pointBlank(outerPoints.lastElement(), edge.b)) {
-                    outerPoints.add(edge.a);
-                    outerEdges.remove(edge);
-                    fine = true;
-                    break;
-                }
-            }
-            if (!fine) {
-                //when all goes wrong
-                firstEdge = outerEdges.firstElement();
-                outerPoints.add(firstEdge.a);
-                outerPoints.add(firstEdge.b);
-                outerEdges.remove(firstEdge);
-            }
-        } while (!outerEdges.isEmpty());
+        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
+
+        Vector<Vector2D> outerPoints = calculatePoints(
+                outerEdges, new Vector<>()
+        );
+
+//        Vector<Vector2D> outerPoints = new Vector<>();
+//        Edge2D firstEdge = outerEdges.firstElement();
+//        outerPoints.add(firstEdge.a);
+//        outerPoints.add(firstEdge.b);
+//        outerEdges.remove(firstEdge);
+//        do {
+//            dumpPoints(outerPoints, 1000, 1000);
+//            boolean fine = false;
+//            for (Edge2D edge : new Vector<>(outerEdges)) {
+//                if (pointBlank(outerPoints.lastElement(), edge.a)) {
+//                    outerPoints.add(edge.b);
+//                    outerEdges.remove(edge);
+//                    fine = true;
+//                    break;
+//                } else if (pointBlank(outerPoints.lastElement(), edge.b)) {
+//                    outerPoints.add(edge.a);
+//                    outerEdges.remove(edge);
+//                    fine = true;
+//                    break;
+//                }
+//            }
+//            if (!fine) {
+//                System.out.println("!!!");
+//                //when all goes wrong
+//                firstEdge = outerEdges.firstElement();
+//                outerPoints.add(firstEdge.a);
+//                outerPoints.add(firstEdge.b);
+//                outerEdges.remove(firstEdge);
+//            }
+//        } while (!outerEdges.isEmpty());
 
         outerPoints.remove(outerPoints.lastElement());
 
@@ -107,6 +122,9 @@ public class Generator {
 
         graphics.fillPolygon(polygon);
 
+//        graphics.setColor(Color.GREEN);
+//        graphics.drawPolygon(polygon);
+//
 //        graphics.setColor(Color.RED);
 //        bs = new BasicStroke(5);
 //        graphics.setStroke(bs);
@@ -127,6 +145,53 @@ public class Generator {
 
     }
 
+    protected static Vector<Vector2D> calculatePoints(Vector<Edge2D> edges, Vector<Vector2D> points) {
+        if (points.isEmpty()) {
+            Vector<Edge2D> edgesInt = new Vector<>(edges);
+            Edge2D firstEdge = edges.firstElement();
+            Vector<Vector2D> pointsInt = new Vector<>(points);
+            pointsInt.add(firstEdge.a);
+            pointsInt.add(firstEdge.b);
+            edgesInt.remove(firstEdge);
+            return calculatePoints(edgesInt, pointsInt);
+        } else {
+            if (edges.isEmpty()) {
+                return points;
+            }
+//
+            Vector<Edge2D> edgesInt = new Vector<>(edges);
+            Vector<Vector2D> pointsInt = new Vector<>(points);
+            boolean fine = false;
+            for (Edge2D edge : new Vector<>(edgesInt)) {
+                if (pointBlank(pointsInt.lastElement(), edge.a)) {
+                    pointsInt.add(edge.b);
+                    edgesInt.remove(edge);
+                    fine = true;
+                } else if (pointBlank(pointsInt.lastElement(), edge.b)) {
+                    pointsInt.add(edge.b);
+                    edgesInt.remove(edge);
+                    fine = true;
+                }
+                Vector<Vector2D> res = null;
+                if (fine) {
+                    res = calculatePoints(edgesInt, pointsInt);
+                }
+                if (res != null) {
+                    return res;
+                } else {
+                    edgesInt = new Vector<>(edges);
+                    pointsInt = new Vector<>(points);
+                }
+            }
+            if (fine) {
+                return pointsInt;
+            } else {
+                return null;
+            }
+        }
+    }
+
+
     protected static Tuple<List<Triangle2D>, Vector<Edge2D>> trySoup(Vector<Vector2D> points) {
         DelaunayTriangulator delaunayTriangulator = new DelaunayTriangulator(points);
         try {
@@ -141,7 +206,7 @@ public class Generator {
         return new Tuple<>(triangleSoup, outerEdges);
     }
 
-    private static Triangle2D getOuterTriangle(List<Triangle2D> triangleSoup) {
+    private static Triangle2D getOuterTriangle(List<Triangle2D> triangleSoup, Vector<Vector2D> points) {
         Vector<Edge2D> outerEdges = getOuterEdges(triangleSoup);
         Map<Triangle2D, Integer> map = new HashMap<>();
         for (Edge2D edge : outerEdges) {
@@ -155,12 +220,130 @@ public class Generator {
                 }
             }
         }
-        for (Map.Entry<Triangle2D, Integer> entry : map.entrySet()) {
-            if (entry.getValue() == 1) {
-                return entry.getKey();
+
+//        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
+
+//        for (int i = 1; i < 3; i++) {
+            for (Map.Entry<Triangle2D, Integer> entry : map.entrySet()) {
+                if (entry.getValue() == 1) {
+                    int hits = 0;
+                    for (Vector2D point : points) {
+                        if (hasVertex(entry.getKey(), point)) {
+                            hits ++;
+                        }
+                    }
+                    if (hits < 3) {
+                        return entry.getKey();
+                    }
+                }
             }
-        }
+//        }
+//        for (int i = 1; i < 3; i++) {
+            for (Map.Entry<Triangle2D, Integer> entry : map.entrySet()) {
+                if (entry.getValue() == 1) {
+                    int hits = 0;
+                    for (Vector2D point : points) {
+                        if (hasVertex(entry.getKey(), point)) {
+                            hits ++;
+                        }
+                    }
+                    if (hits == 3) {
+                        return entry.getKey();
+                    }
+                }
+            }
+//        }
+
+//        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
+
         throw new IllegalStateException("Cannot find triangle to delete");
+    }
+
+    private static void dumpPoints(Vector<Vector2D> points, int width, int height) {
+        int step = points.size();
+        Vector<Vector2D> pointsInt = new Vector<>(points);
+        BufferedImage canvas = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = canvas.createGraphics();
+
+        graphics.setBackground(Color.WHITE);
+        graphics.fillRect(0, 0, width, height);
+        graphics.setColor(Color.BLACK);
+        BasicStroke bs = new BasicStroke(1);
+        graphics.setStroke(bs);
+
+        Path2D path = new Path2D.Double();
+        Vector2D init = pointsInt.firstElement();
+        path.moveTo(init.x, init.y);
+        pointsInt.remove(pointsInt);
+        for (Vector2D point : pointsInt) {
+            path.lineTo(point.x, point.y);
+        }
+
+        graphics.draw(path);
+
+        try {
+            ImageIO.write(canvas, "png", new File("./edges"+step+".png"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private static void dumpSoup(List<Triangle2D> soup, Vector<Vector2D> points, Vector<Edge2D> outerEdges, int width, int height) {
+        BufferedImage canvas = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = canvas.createGraphics();
+
+        graphics.setBackground(Color.WHITE);
+        graphics.fillRect(0, 0, width, height);
+        graphics.setColor(Color.BLACK);
+        BasicStroke bs = new BasicStroke(1);
+        graphics.setStroke(bs);
+
+        for (Triangle2D triangle: soup) {
+            Polygon polygon = new Polygon();
+            polygon.addPoint(
+                    Double.valueOf(triangle.a.x).intValue(), Double.valueOf(triangle.a.y).intValue()
+            );
+            polygon.addPoint(
+                    Double.valueOf(triangle.b.x).intValue(), Double.valueOf(triangle.b.y).intValue()
+            );
+            polygon.addPoint(
+                    Double.valueOf(triangle.c.x).intValue(), Double.valueOf(triangle.c.y).intValue()
+            );
+            graphics.drawPolygon(polygon);
+        }
+
+        graphics.setColor(Color.RED);
+        bs = new BasicStroke(5);
+        graphics.setStroke(bs);
+        for (Vector2D point : points) {
+            graphics.drawLine(
+                    Double.valueOf(point.x).intValue(), Double.valueOf(point.y).intValue(),
+                    Double.valueOf(point.x).intValue(), Double.valueOf(point.y).intValue()
+            );
+        }
+
+        graphics.setColor(Color.GREEN);
+        bs = new BasicStroke(1);
+        graphics.setStroke(bs);
+
+        for (Edge2D edge : outerEdges) {
+            graphics.drawLine(
+                    Double.valueOf(edge.a.x).intValue(), Double.valueOf(edge.a.y).intValue(),
+                    Double.valueOf(edge.b.x).intValue(), Double.valueOf(edge.b.y).intValue()
+            );
+        }
+
+        try {
+            ImageIO.write(canvas, "png", new File("./soup.png"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private static boolean hasVertex(Triangle2D triangle, Vector2D point) {
+        return pointBlank(triangle.a, point) || pointBlank(triangle.b, point) || pointBlank(triangle.c, point);
     }
 
     private static Vector<Edge2D> getOuterEdges(List<Triangle2D> triangleSoup) {
@@ -201,7 +384,8 @@ public class Generator {
 
     protected static boolean pointBlank(Vector2D one, Vector2D two) {
         //should use epsilon?
-        return (one.x == two.x) && (one.y == two.y);
+        return distance(one, two) < epsilon;
+//        return (one.x == two.x) && (one.y == two.y);
     }
 
     protected static class Tuple<A,B> {
