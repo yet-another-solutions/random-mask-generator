@@ -158,7 +158,7 @@ public class Generator {
             if (edges.isEmpty()) {
                 return points;
             }
-//
+//            dumpPoints(points, 1000, 1000);
             Vector<Edge2D> edgesInt = new Vector<>(edges);
             Vector<Vector2D> pointsInt = new Vector<>(points);
             boolean fine = false;
@@ -168,7 +168,7 @@ public class Generator {
                     edgesInt.remove(edge);
                     fine = true;
                 } else if (pointBlank(pointsInt.lastElement(), edge.b)) {
-                    pointsInt.add(edge.b);
+                    pointsInt.add(edge.a);
                     edgesInt.remove(edge);
                     fine = true;
                 }
@@ -179,6 +179,7 @@ public class Generator {
                 if (res != null) {
                     return res;
                 } else {
+                    fine = false;
                     edgesInt = new Vector<>(edges);
                     pointsInt = new Vector<>(points);
                 }
