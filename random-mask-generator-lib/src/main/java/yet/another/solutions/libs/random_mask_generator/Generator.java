@@ -69,7 +69,7 @@ public class Generator {
             outerEdges = getOuterEdges(triangleSoup);
         }
 
-        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
+//        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
 
         Vector<Vector2D> outerPoints = calculatePoints(
                 outerEdges, new Vector<>()
