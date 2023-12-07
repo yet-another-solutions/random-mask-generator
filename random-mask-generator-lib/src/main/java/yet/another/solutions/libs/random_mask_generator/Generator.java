@@ -9,7 +9,9 @@ import io.github.jdiemke.triangulation.Vector2D;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Vector;
 
@@ -44,50 +46,21 @@ public class Generator {
             }
         }
 
+
+        Vector<Vector2D> pointsOrig = new Vector<>(points);
+
         Tuple<List<Triangle2D>, Vector<Edge2D>> soupTuple = null;
         int desiredNum = num;
         List<Triangle2D> triangleSoup = null;
         Vector<Edge2D> outerEdges = null;
 
-        do {
-            do {
-                if (soupTuple != null) {
-                    if (soupTuple.b.size() < num) {
-                        desiredNum++;
-                        while (points.size() < desiredNum) {
-                            Vector2D point = new Vector2D(
-                                    random.nextDouble(width),
-                                    random.nextDouble(height)
-                            );
-                            boolean good = true;
-                            if (point.x < minfree || point.y < minfree || point.x > (width - minfree) || point.y > (height - minfree)) {
-                                good = false;
-                            }
-                            if (good) {
-                                for (Vector2D existingPoint : points) {
-                                    if (distance(existingPoint, point) < stepD) {
-                                        good = false;
-                                    }
-                                }
-                            }
-                            if (good) {
-                                points.add(point);
-                            }
-                        }
-                    }
-                }
-                soupTuple = trySoup(points);
-
-            } while (soupTuple.b.size() < num);
-
-            triangleSoup = soupTuple.a;
-            outerEdges = soupTuple.b;
-
-            while (outerEdges.size() > num) {
-                triangleSoup.remove(getOuterTriangle(triangleSoup));
-                outerEdges = getOuterEdges(triangleSoup);
-            }
-        } while (outerEdges.size() != num);
+        soupTuple = trySoup(points);
+        triangleSoup = soupTuple.a;
+        outerEdges = soupTuple.b;
+        while (outerEdges.size() < num) {
+            triangleSoup.remove(getOuterTriangle(triangleSoup));
+            outerEdges = getOuterEdges(triangleSoup);
+        }
 
         Vector<Vector2D> outerPoints = new Vector<>();
         Edge2D firstEdge = outerEdges.firstElement();
@@ -124,6 +97,18 @@ public class Generator {
 
         graphics.fillPolygon(polygon);
 
+//        graphics.setColor(Color.RED);
+//        bs = new BasicStroke(5);
+//        graphics.setStroke(bs);
+//        for (Vector2D point : pointsOrig) {
+//            graphics.drawLine(
+//                    Double.valueOf(point.x).intValue(), Double.valueOf(point.y).intValue(),
+//                    Double.valueOf(point.x).intValue(), Double.valueOf(point.y).intValue()
+//            );
+//        }
+
+
+
 
 
 
@@ -148,11 +133,21 @@ public class Generator {
 
     private static Triangle2D getOuterTriangle(List<Triangle2D> triangleSoup) {
         Vector<Edge2D> outerEdges = getOuterEdges(triangleSoup);
+        Map<Triangle2D, Integer> map = new HashMap<>();
         for (Edge2D edge : outerEdges) {
             for (Triangle2D triangle : triangleSoup) {
                 if (triangle.isNeighbour(edge)) {
-                    return triangle;
+                    if (map.containsKey(triangle)) {
+                        map.put(triangle, map.get(triangle) + 1);
+                    } else {
+                        map.put(triangle, 1);
+                    }
                 }
+            }
+        }
+        for (Map.Entry<Triangle2D, Integer> entry : map.entrySet()) {
+            if (entry.getValue() == 1) {
+                return entry.getKey();
             }
         }
         throw new IllegalStateException("Cannot find triangle to delete");
@@ -177,9 +172,10 @@ public class Generator {
                 }
             }
             edges.removeAll(edgeToDelete);
-            if (edges.size() > 2) {
-                throw new IllegalStateException("Strange...");
-            }
+            //not needed, there can be triangles completely inside
+//            if (edges.size() > 2) {
+//                throw new IllegalStateException("Strange...");
+//            }
             if (edges.size() > 0) {
                 outerEdges.addAll(edges);
             }
