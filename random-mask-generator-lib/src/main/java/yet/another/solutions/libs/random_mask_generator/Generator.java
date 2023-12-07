@@ -68,16 +68,26 @@ public class Generator {
         outerPoints.add(firstEdge.b);
         outerEdges.remove(firstEdge);
         do {
+            boolean fine = false;
             for (Edge2D edge : new Vector<>(outerEdges)) {
                 if (pointBlank(outerPoints.lastElement(), edge.a)) {
                     outerPoints.add(edge.b);
                     outerEdges.remove(edge);
+                    fine = true;
                     break;
                 } else if (pointBlank(outerPoints.lastElement(), edge.b)) {
                     outerPoints.add(edge.a);
                     outerEdges.remove(edge);
+                    fine = true;
                     break;
                 }
+            }
+            if (!fine) {
+                //when all goes wrong
+                firstEdge = outerEdges.firstElement();
+                outerPoints.add(firstEdge.a);
+                outerPoints.add(firstEdge.b);
+                outerEdges.remove(firstEdge);
             }
         } while (!outerEdges.isEmpty());
 
