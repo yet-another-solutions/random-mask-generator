@@ -24,32 +24,60 @@ public class Generator {
 
     protected final static double epsilon = 0.000000001d;
 
-    public static BufferedImage createRandom(int height, int width, int minfree, int num) {
+    public static enum SnapMode {
+        NONE,
+        TOP,
+        BOTTOM,
+        LEFT,
+        RIGHT
+    }
+
+    public static BufferedImage createRandom(int height, int width, int minfree, int num, SnapMode snap) {
         Random random = new Random();
         int step = Math.min(height, width) / num;
         double stepD = step;
         if (step < 10) {
             throw new IllegalArgumentException("Step is too tiny. Min(height,width)/num must be greater or equal 10");
         }
+        int desiredNum = num;
+        if (snap != SnapMode.NONE) {
+            desiredNum = desiredNum - 4;
+        }
         Vector<Vector2D> points = new Vector<>();
-        while (points.size() < num) {
-            Vector2D point = new Vector2D(
-                    random.nextDouble(width),
-                    random.nextDouble(height)
-            );
-            boolean good = true;
-            if (point.x < minfree || point.y < minfree || point.x > (width - minfree) || point.y > (height - minfree)) {
-                good = false;
-            }
-            if (good) {
-                for (Vector2D existingPoint : points) {
-                    if (distance(existingPoint, point) < stepD) {
-                        good = false;
-                    }
+        Vector<Vector2D> specialPoints = new Vector<>();
+        duPoint(height, width, minfree, snap, points, desiredNum, random, stepD);
+
+        if (snap != SnapMode.NONE) {
+            switch (snap) {
+                case TOP -> {
+                    points.add(0, new Vector2D(0, stepD));
+                    points.add(0, new Vector2D(0, 0));
+                    points.add(new Vector2D(width, stepD));
+                    points.add(new Vector2D(width, 0));
+                    specialPoints.add(0, new Vector2D(0, stepD));
+                    specialPoints.add(0, new Vector2D(0, 0));
+                    specialPoints.add(new Vector2D(width, stepD));
+                    specialPoints.add(new Vector2D(width, 0));
+                    break;
                 }
-            }
-            if (good) {
-                points.add(point);
+                case LEFT -> {
+                    points.add(0, new Vector2D(stepD, height));
+                    points.add(0, new Vector2D(0, height));
+                    points.add(new Vector2D(stepD, 0));
+                    points.add(new Vector2D(0, 0));
+                    break;
+                }
+                case RIGHT -> {
+                    points.add(0, new Vector2D(width, height));
+                    points.add(new Vector2D(width, 0));
+                    break;
+                }
+                case BOTTOM -> {
+                    points.add(0, new Vector2D(0, 0));
+                    points.add(new Vector2D(width, 0));
+                    break;
+                }
+                default -> throw new IllegalStateException("Should never be here");
             }
         }
 
@@ -57,7 +85,6 @@ public class Generator {
         Vector<Vector2D> pointsOrig = new Vector<>(points);
 
         Tuple<List<Triangle2D>, Vector<Edge2D>> soupTuple = null;
-        int desiredNum = num;
         List<Triangle2D> triangleSoup = null;
         Vector<Edge2D> outerEdges = null;
 
@@ -65,7 +92,15 @@ public class Generator {
         triangleSoup = soupTuple.a;
         outerEdges = soupTuple.b;
         while (outerEdges.size() < num) {
-            triangleSoup.remove(getOuterTriangle(triangleSoup, points));
+            Triangle2D toDelete = getOuterTriangle(triangleSoup, points, snap, specialPoints);
+            if (toDelete == null) {
+                desiredNum++;
+                duPoint(height, width, minfree, snap, points, desiredNum, random, stepD);
+                soupTuple = trySoup(points);
+                triangleSoup = soupTuple.a;
+                outerEdges = soupTuple.b;
+            }
+            triangleSoup.remove(getOuterTriangle(triangleSoup, points, snap, specialPoints));
             outerEdges = getOuterEdges(triangleSoup);
         }
 
@@ -145,6 +180,45 @@ public class Generator {
 
     }
 
+    private static void duPoint(int height, int width, int minfree, SnapMode snap, Vector<Vector2D> points, int desiredNum, Random random, double stepD) {
+        while (points.size() < desiredNum) {
+            Vector2D point = new Vector2D(
+                    random.nextDouble(width),
+                    random.nextDouble(height)
+            );
+            boolean good = true;
+            if (point.x < minfree || point.y < minfree || point.x > (width - minfree) || point.y > (height - minfree)) {
+                good = false;
+            }
+            if (good && snap != SnapMode.NONE) {
+                switch (snap) {
+                    case TOP -> {
+                        if (point.y < stepD *2 && point.x > stepD *2 && point.y < width - stepD *2) {
+                            good = false;
+                        }
+                        break;
+                    }
+                    case LEFT -> {
+                        if (point.x < stepD) {
+                            good = false;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (good) {
+                for (Vector2D existingPoint : points) {
+                    if (distance(existingPoint, point) < stepD) {
+                        good = false;
+                    }
+                }
+            }
+            if (good) {
+                points.add(point);
+            }
+        }
+    }
+
     protected static Vector<Vector2D> calculatePoints(Vector<Edge2D> edges, Vector<Vector2D> points) {
         if (points.isEmpty()) {
             Vector<Edge2D> edgesInt = new Vector<>(edges);
@@ -207,7 +281,11 @@ public class Generator {
         return new Tuple<>(triangleSoup, outerEdges);
     }
 
-    private static Triangle2D getOuterTriangle(List<Triangle2D> triangleSoup, Vector<Vector2D> points) {
+    private static boolean containsPoint(Triangle2D triangle, Vector<Vector2D> points) {
+        return points.stream().anyMatch(vector2D -> pointBlank(triangle.a, vector2D) || pointBlank(triangle.b, vector2D) || pointBlank(triangle.c, vector2D));
+    }
+
+    private static Triangle2D getOuterTriangle(List<Triangle2D> triangleSoup, Vector<Vector2D> points, SnapMode snap, Vector<Vector2D> specialPoints) {
         Vector<Edge2D> outerEdges = getOuterEdges(triangleSoup);
         Map<Triangle2D, Integer> map = new HashMap<>();
         for (Edge2D edge : outerEdges) {
@@ -217,6 +295,17 @@ public class Generator {
                         map.put(triangle, map.get(triangle) + 1);
                     } else {
                         map.put(triangle, 1);
+                    }
+                    if (snap != SnapMode.NONE) {
+                        switch (snap) {
+                            case TOP -> {
+                                if (containsPoint(triangle, specialPoints)) {
+                                    map.put(triangle, 100);
+                                }
+                                break;
+                            }
+                            default -> throw new IllegalStateException("Should never be there");
+                        }
                     }
                 }
             }
@@ -257,7 +346,7 @@ public class Generator {
 
 //        dumpSoup(triangleSoup, points, outerEdges, 1000, 1000);
 
-        throw new IllegalStateException("Cannot find triangle to delete");
+        return null;
     }
 
     private static void dumpPoints(Vector<Vector2D> points, int width, int height) {
